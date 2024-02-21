@@ -20,6 +20,9 @@ bool EdgesRunnable::Init()
 
 uint32 EdgesRunnable::Run()
 {
+	// Allow some time for the threads to start
+	FPlatformProcess::Sleep(0.01);
+	
 	auto StartTime = FDateTime::UtcNow();
 	TArray<FVector> Directions;
 	Directions.Add(FVector(1.f, 0.f, 0.f));

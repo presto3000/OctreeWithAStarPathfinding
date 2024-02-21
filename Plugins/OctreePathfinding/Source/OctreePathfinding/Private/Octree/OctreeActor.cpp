@@ -487,8 +487,7 @@ void AOctreeActor::ConnectLeafNodeNeighboursMultithreaded()
 {
 	int MaxThreads = FPlatformMisc::NumberOfCores();
 	//int MaxThreads = 4;
-	// Allow some time for the threads to start
-	FPlatformProcess::Sleep(0.5);
+
 	const int Start = 0;
 	const int End = EmptyLeaves.Num() - 1;
 	// Create runnables and threads
