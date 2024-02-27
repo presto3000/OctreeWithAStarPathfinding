@@ -16,13 +16,17 @@
 
 FNodeOctree::~FNodeOctree()
 {
-	for (const FNodeOctree* Child : Children)
+	// Delete child nodes
+	for (int32 i = Children.Num() - 1; i >= 0; --i)
 	{
-		if (Child != nullptr)
+		if (Children[i] != nullptr)
 		{
-			delete Child; // Delete the child object
+			delete Children[i];
+			Children[i] = nullptr;
 		}
 	}
+	Children.Empty();
+	
 	PrestoLOG::Log("FNode OctreeDeleted: ", this->Id);
 }
 
@@ -54,12 +58,47 @@ void FNodeOctree::Draw(UWorld* InWorldContext)
 	//{
 	//	//DrawDebugSphere(InWorldContext, NodeBounds.GetCenter(), NodeBounds.GetExtent().Length()/2.f, 12, FColor::Blue, true, -10, 0);
 	//}
+	// Draw Occupied
+	if (bIsOccupied)
+	{
+		DrawDebugSphere(InWorldContext, NodeBounds.GetCenter(), NodeBounds.GetExtent().Length()/2.f, 12, FColor::Blue, true, -10, 0);
+	}
 }
 
-FOctreeActor::~FOctreeActor()
+void FNodeOctree::MarkNodesAsNotOccupied(const AActor* InActor)
 {
-	PrestoLOG::Log("FOctreeActor DESTRUCTOR");
+	if (NodeBounds.Intersect(InActor->GetComponentsBoundingBox()))
+	{
+		bIsOccupied = false;
+		// Recursively mark child nodes as not occupied
+		for (int32 i = 0; i < 8; ++i)
+		{
+			if (!IsLeafNode())
+			{
+				if (Children[i] != nullptr)
+				{
+					Children[i]->MarkNodesAsNotOccupied(InActor);
+				}
+			}
+		}
+	}
 }
+
+void FNodeOctree::RemoveAllOctreeNodes()
+{
+	for (FNodeOctree* ChildNode : Children)
+	{
+		if (ChildNode != nullptr)
+		{
+			ChildNode->RemoveAllOctreeNodes();
+			//  Delete child nodes
+			delete ChildNode;
+			ChildNode = nullptr;
+		}
+	}
+	Children.Empty();
+}
+
 
 void AOctreeActor::BeginPlay()
 {
@@ -109,32 +148,28 @@ void AOctreeActor::CreateOctree()
 		AddObjects(WorldActors);
 		const double End = FPlatformTime::Seconds();
 		UE_LOG(LogTemp, Warning, TEXT("OCTREE CRATED in: %f ms"),(End-Start)*1000.f);
-		GetEmptyLeaves(RootNode);
-		//DrawEmptyLeaves();
-		ConnectLeafNodeNeighboursMultithreaded();
-		//ConnectLeafNodeNeighbours();
-		//ProcessExtraConnections();
-		//PrestoLOG::ScreenLog5("Edge: ", NavigationGraph->Edges.Num());
 
+		if (bProcessObjectsAndEdgesOnStart)
+		{
+			ProcessObjectsAndEdges(WorldActors);
+		}
 		
-		//if (bDebugLines)
-		//{
-		//	RootNode->Draw(World);
-		//	
-		//}
-		//if (bDebugLinesGraph)
-		//{
-		//	NavigationGraph->Draw(World);
-		//}
-		TArray<int32> Numbers;
-		
-
-		PrestoLOG::Log("RootNodeId:", RootNode->Id);
-		PrestoLOG::Log("Nodes Number: ", NavigationGraph->Nodes.Num());
-		PrestoLOG::Log("Edges Number: ", NavigationGraph->Edges.Num());
 	}
 
 }
+
+void AOctreeActor::ProcessObjectsAndEdges(const TArray<AActor*>& InWorldActors)
+{
+	GetEmptyLeaves(RootNode);
+	//DrawEmptyLeaves();
+	ConnectLeafNodeNeighboursMultithreaded();
+
+	
+	PrestoLOG::Log("RootNodeId:", RootNode->Id);
+	PrestoLOG::Log("Nodes Number: ", NavigationGraph->Nodes.Num());
+	PrestoLOG::Log("Edges Number: ", NavigationGraph->Edges.Num());
+}
+
 void AOctreeActor::DrawDebug()
 {
 	if (bDebugLines)
@@ -172,13 +207,12 @@ void FNodeOctree::AddObject(UWorld* InWorldContext, AActor* InObject)
 {
 	DivideAndAdd(InWorldContext, InObject);
 }
-void FNodeOctree::DivideAndAdd(UWorld* InWorldContext, AActor* InObject)
+void FNodeOctree::DivideAndAdd(UWorld* InWorldContext, AActor* InActor)
 {	
-	//auto OctObj = MakeShared<FOctreeActor>(InObject);
 	// Stop Condition
 	if (NodeBounds.GetSize().Y <= MinSize)
 	{
-		//ContainedActors.Add(OctObj);
+		ContainedActors.Add(InActor);
 		bIsOccupied = true;
 		//DrawDebugBox(InWorldContext, NodeBounds.GetCenter(), NodeBounds.GetExtent(), FColor::Cyan, true, -1, 0, 7);
 		return;
@@ -215,23 +249,23 @@ void FNodeOctree::DivideAndAdd(UWorld* InWorldContext, AActor* InObject)
 			if (ChildBounds[i].GetCenter().Z < HitResult.ImpactPoint.Z)
 			{
 				bDividing = true;
-				Children[i]->DivideAndAdd(InWorldContext, InObject);
+				Children[i]->DivideAndAdd(InWorldContext, InActor);
 			}
 		}
 		if (!bCenterIsBelowLandscape)
 		{
-			if (InObject->Tags.Contains("Landscape"))
+			if (InActor->Tags.Contains("Landscape"))
 			{
 				FHitResult HitResult2;
 				FVector Start2 = ChildBounds[i].GetCenter() + FVector(0, 0, ChildBounds[i].GetExtent().Z); // Start at the top of the node's bounding box
 				FVector End2 = ChildBounds[i].GetCenter() - FVector(0, 0, ChildBounds[i].GetExtent().Z); // End at the bottom of the node's bounding box
 				if (InWorldContext->LineTraceSingleByChannel(HitResult2, Start2, End2, ECC_WorldStatic, Params))
 				{
-					if (HitResult2.GetActor() == InObject)
+					if (HitResult2.GetActor() == InActor)
 					{
 						bDividing = true;
 
-						Children[i]->DivideAndAdd(InWorldContext, InObject);
+						Children[i]->DivideAndAdd(InWorldContext, InActor);
 					}
 					//DrawDebugLine(InWorldContext, Start, End, FColor::Red, true, -1, 0, 10);
 					//PrestoLOG::ScreenLog5("FOUND LANDSCAPE");
@@ -241,10 +275,10 @@ void FNodeOctree::DivideAndAdd(UWorld* InWorldContext, AActor* InObject)
 			{
 				// Is inside / or Intersect
 				//if (ChildBounds[i].IsInside(OctObj.Bounds.Min) && ChildBounds[i].IsInside(OctObj.Bounds.Max))
-				if (ChildBounds[i].Intersect(InObject->GetComponentsBoundingBox()))
+				if (ChildBounds[i].Intersect(InActor->GetComponentsBoundingBox()))
 				{
 					bDividing = true;
-					Children[i]->DivideAndAdd(InWorldContext, InObject);
+					Children[i]->DivideAndAdd(InWorldContext, InActor);
 					//PrestoLOG::ScreenLog5("IS INSIDE");
 				}	
 			}
@@ -252,8 +286,12 @@ void FNodeOctree::DivideAndAdd(UWorld* InWorldContext, AActor* InObject)
 	}
 	if (bDividing == false)
 	{
-		bIsOccupied = true;
-		Children.Empty();
+		ContainedActors.AddUnique(InActor);
+		for (FNodeOctree*& ChildNode : Children)
+		{
+			delete ChildNode;
+			ChildNode = nullptr;
+		}
 	}
 }
 
@@ -486,6 +524,12 @@ bool AOctreeActor::IntersectRayWithBox(const FVector& RayOrigin, const FVector& 
 void AOctreeActor::ConnectLeafNodeNeighboursMultithreaded()
 {
 	int MaxThreads = FPlatformMisc::NumberOfCores();
+	if (EmptyLeaves.Num() <= MaxThreads)
+	{
+		ConnectLeafNodeNeighbours();
+		return;
+	}
+
 	//int MaxThreads = 4;
 
 	const int Start = 0;
@@ -576,11 +620,94 @@ void AOctreeActor::ProcessLeafNodes(int startIndex, int endIndex)
 
 }
 
+// ----------------------------------------------------------------------------------- //
+
+
+void AOctreeActor::RemoveActorFromOctreeBP(AActor* ActorToRemove)
+{
+	RemoveActorFromOctree(ActorToRemove, RootNode);
+}
+
+ void AOctreeActor::RemoveActorFromOctree(AActor* ActorToRemove, FNodeOctree*& CurrentNode)
+ {
+ 	if (!CurrentNode)
+ 		return;
+ 
+ 	// If it's a leaf node and contains the actor, remove the actor
+ 	if (CurrentNode->IsLeafNode() && CurrentNode->ContainsActor(ActorToRemove))
+ 	{
+ 		CurrentNode->RemoveActor(ActorToRemove);
+ 		if (!CurrentNode->HasActors())
+ 		{
+ 			CurrentNode->bIsOccupied = false;
+ 		}
+ 	}
+	
+ 	if (!CurrentNode->IsLeafNode())
+ 	{
+ 		for (int32 i = 0; i < 8; ++i)
+ 		{
+ 			if (CurrentNode->Children[i] != nullptr)
+ 			{
+ 				RemoveActorFromOctree(ActorToRemove, CurrentNode->Children[i]);
+ 			}
+ 		}
+ 	}
+ }
+
+void AOctreeActor::PurgeEmptyBranches(TArray<FNodeOctree*>& InOctreeNodes)
+{
+	// Nodes to Delete
+	for (int32 i = InOctreeNodes.Num() - 1; i >= 0; --i)
+	{
+		FNodeOctree* NodeToDelete = InOctreeNodes[i];
+		PurgeBranchIfEmpty(NodeToDelete);
+	}
+	
+	InOctreeNodes.Empty();
+}
+
+void AOctreeActor::PurgeBranchIfEmpty(FNodeOctree*& Node)
+{
+	if (Node == nullptr || Node->Parent == nullptr || RootNode->Children.Contains(Node))
+		return;
+	
+	PurgeBranchIfEmpty(Node->Parent);
+
+	for (int32 i = 0; i < Node->Parent->Children.Num(); ++i)
+	{
+		if (Node->Parent->Children[i] == Node)
+		{
+			delete Node->Parent->Children[i];
+			Node->Parent->Children.RemoveAt(i);
+			break;
+		}
+	}
+}
+
+void AOctreeActor::DeleteAllNodesFromOctree()
+{
+	if (RootNode != nullptr)
+	{
+		RootNode->RemoveAllOctreeNodes();
+	}
+}
+
+void AOctreeActor::MarkNodesAsUnOccupiedForActor(const AActor* InActor) const
+{
+	if (RootNode != nullptr)
+	{
+		RootNode->MarkNodesAsNotOccupied(InActor);
+	}
+}
+
+
 void AOctreeActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 	
 	Threads.Empty();
 	EdgesRunnables.Empty();
+	delete RootNode;
 }
 

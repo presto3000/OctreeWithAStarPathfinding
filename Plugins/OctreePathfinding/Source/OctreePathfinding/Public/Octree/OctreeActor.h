@@ -8,46 +8,55 @@
 #include "Runnables/EdgesRunnable.h"
 #include "OctreeActor.generated.h"
 
-
 class ALandscapeProxy;
 class FGraphEntity;
 class UBoxComponent;
 
-
-
-struct FOctreeActor
-{
-	FBox Bounds;
-	UObject* GameObject;
-
-	FOctreeActor(AActor* InActor):
-	GameObject(InActor)
-	{
-		Bounds = InActor->GetComponentsBoundingBox();
-	}
-	~FOctreeActor();
-};
-
 // ---------------- OCTREE NODE --------------- //
 
+USTRUCT(BlueprintType)
 struct FNodeOctree
 {
+	GENERATED_USTRUCT_BODY()
 	int32 Id;
 	FBox NodeBounds;
 	TArray<FBox> ChildBounds;
 	TArray<FNodeOctree*> Children;
 	float MinSize = 100;
-	FVector ChildSize;
-	//TArray<TSharedPtr<FOctreeActor>> ContainedActors;
+	UPROPERTY()
+	TArray<AActor*> ContainedActors;
 	FNodeOctree* Parent;
 	FVector Center;
 	FVector HalfSize;
-
-	void Draw(UWorld* InWorldContext);
-	void DivideAndAdd(UWorld* InWorldContext, AActor* InObject);
-	void AddObject(UWorld* InWorldContext, AActor* InObject);
 	bool bIsOccupied = false;
+	
+	void Draw(UWorld* InWorldContext);
+	void DivideAndAdd(UWorld* InWorldContext, AActor* InActor);
+	void AddObject(UWorld* InWorldContext, AActor* InObject);
+	void MarkNodesAsNotOccupied(const AActor* InActor);
+	void RemoveAllOctreeNodes();
+	
+	bool HasActors() const
+	{
+		return ContainedActors.Num() > 0;
+	}
 
+	bool IsLeafNode() const
+	{
+		return Children.Num() == 0;
+	}
+
+	void RemoveActor(AActor* ActorToRemove)
+	{
+		ContainedActors.Remove(ActorToRemove);
+	}
+
+	bool ContainsActor(AActor* ActorToCheck) const
+	{
+		return ContainedActors.Contains(ActorToCheck);
+	}
+
+	
 	FNodeOctree(): Id(0), Parent(nullptr)
 	{
 	} ;
@@ -103,7 +112,9 @@ public:
 	bool bDebugLinesGraph = true;
 	UPROPERTY(EditAnywhere, Category = DEBUG)
 	bool bAddLandscapeActor = true;
-
+	UPROPERTY(EditAnywhere, Category = DEBUG)
+	bool bProcessObjectsAndEdgesOnStart = true;
+	
 	TArray<FNodeOctree*> EmptyLeaves;
 	bool IntersectRayWithBox(const FVector& RayOrigin, const FVector& RayDirection, const FBox& Box, float& HitLength, float MaxLength);
 	
@@ -125,11 +136,15 @@ protected:
 	UPROPERTY(BlueprintReadWrite, VisibleAnywhere)
 	UBoxComponent* BoxComponent;
 	
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
 	TArray<AActor*> WorldActors;
 	UPROPERTY(EditAnywhere)
 	float MinNodeSize = 100.f;
 
+
+	// Declaration of a list to store nodes to delete
+	TArray<FNodeOctree*> NodesToDelete;
+	
 	UFUNCTION(BlueprintCallable)
 	void CreateOctree();
 	UFUNCTION(CallInEditor)
@@ -143,11 +158,27 @@ protected:
 	
 	void ConnectLeafNodeNeighboursMultithreaded();
 	void ProcessLeafNodes(int startIndex, int endIndex);
+
+	UFUNCTION(BlueprintCallable)
+	void DeleteAllNodesFromOctree();
+	UFUNCTION(BlueprintCallable)
+	void MarkNodesAsUnOccupiedForActor(const AActor* InActor) const;
+	UFUNCTION(BlueprintCallable)
+	void RemoveActorFromOctreeBP(AActor* ActorToRemove);
+	
+	void RemoveActorFromOctree(AActor* ActorToRemove, FNodeOctree*& CurrentNode);
+	void PurgeEmptyBranches(TArray<FNodeOctree*>& InOctreeNodes);
+	void PurgeBranchIfEmpty(FNodeOctree*& Node);
+
+	
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
 
 	UFUNCTION(BlueprintCallable)
 	void DrawDebug();
 	void DrawEmptyLeaves();
+
+	UFUNCTION(BlueprintCallable)
+	void ProcessObjectsAndEdges(const TArray<AActor*>& InWorldActors);
 
 public:
 	virtual void Tick(float DeltaTime) override;
