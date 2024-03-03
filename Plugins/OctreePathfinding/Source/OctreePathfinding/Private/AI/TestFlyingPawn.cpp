@@ -13,6 +13,13 @@
 ATestFlyingPawn::ATestFlyingPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
+
+	
+	RootComp = CreateDefaultSubobject<USceneComponent>(TEXT("RootComp"));
+	SetRootComponent(RootComp);
+
+	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
+	Mesh->SetupAttachment(RootComp);
 }
 
 void ATestFlyingPawn::BeginPlay()
@@ -31,48 +38,53 @@ void ATestFlyingPawn::Tick(float DeltaTime)
 
 void ATestFlyingPawn::UpdateMovement2(float DeltaTime)
 {
-	if (Graph == nullptr)
+	if (bIsMoving)
 	{
-		return;
-	}
-	if (GetPathLength() == 0 || CurrentWP == GetPathLength())
-	{
-		return;
-	}
-	// We are close enough
-	if (FVector::Distance(GetPathPoint(CurrentWP)->Center, GetActorLocation()) <= Accuracy)
-	{
-		CurrentWP++;
-	}
-	
-	if (CurrentWP < GetPathLength())
-	{
-		Goal = GetPathPoint(CurrentWP)->Center;
-		CurrentNode = GetPathPoint(CurrentWP);
-		
-		const FVector LookAtGoal{Goal.X, Goal.Y, Goal.Z};
-		FVector Direction = LookAtGoal - GetActorLocation();
-		Direction.Normalize();
-		
-		// Rotation using Slerp
-		const FQuat CurrentRotation = GetActorRotation().Quaternion();
-		const FQuat TargetRotation = FQuat::FindBetweenNormals(FVector::ForwardVector, Direction); // Find the rotation to look in the direction
-		const FQuat NewRotation = FQuat::Slerp(CurrentRotation, TargetRotation, DeltaTime * RotSpeed);
-		SetActorRotation(NewRotation.Rotator());
-		
-		// Move the Pawn
-		const FVector MovementDirection = GetActorForwardVector();
-		const FVector NewLocation = GetActorLocation() + MovementDirection * Speed * DeltaTime;
-		SetActorLocation(NewLocation);
-	}
-	else
-	{
-		if (GetPathLength() == 0)
+		if (Graph == nullptr)
 		{
-			PrestoLOG::Log("NO PATH");
+			return;
+		}
+		if (GetPathLength() == 0 || CurrentWP == GetPathLength())
+		{
+			bHasReachedDestination = true;
+			return;
+		}
+		// We are close enough
+		if (FVector::Distance(GetPathPoint(CurrentWP)->Center, GetActorLocation()) <= Accuracy)
+		{
+			CurrentWP++;
+		}
+	
+		if (CurrentWP < GetPathLength())
+		{
+			bHasReachedDestination = false;
+			Goal = GetPathPoint(CurrentWP)->Center;
+			CurrentNode = GetPathPoint(CurrentWP);
+		
+			const FVector LookAtGoal{Goal.X, Goal.Y, Goal.Z};
+			FVector Direction = LookAtGoal - GetActorLocation();
+			Direction.Normalize();
+		
+			// Rotation using Slerp
+			const FQuat CurrentRotation = GetActorRotation().Quaternion();
+			const FQuat TargetRotation = FQuat::FindBetweenNormals(FVector::ForwardVector, Direction); // Find the rotation to look in the direction
+			const FQuat NewRotation = FQuat::Slerp(CurrentRotation, TargetRotation, DeltaTime * RotSpeed);
+			SetActorRotation(NewRotation.Rotator());
+		
+			// Move the Pawn
+			const FVector MovementDirection = GetActorForwardVector();
+			const FVector NewLocation = GetActorLocation() + MovementDirection * Speed * DeltaTime;
+			SetActorLocation(NewLocation);
+		}
+		else
+		{
+			if (GetPathLength() == 0)
+			{
+				bHasReachedDestination = false;
+				PrestoLOG::Log("NO PATH");
+			}
 		}
 	}
-	
 }
 
 int32 ATestFlyingPawn::GetPathLength() const
@@ -157,17 +169,54 @@ void ATestFlyingPawn::GetRandomDestination()
 		return;
 	}
 	
-	const int32 RandNode = FMath::RandRange(0, Graph->Nodes.Num() - 1);
-	const double Start = FPlatformTime::Seconds();
-	Graph->AStar(Graph->Nodes[CurrentWP]->OctreeNode, Graph->Nodes[RandNode]->OctreeNode, PathList);
-	const double End = FPlatformTime::Seconds();
-	
-	UE_LOG(LogTemp, Warning, TEXT("A* Path created in: %f ms"),(End-Start)*1000.f);
-	CurrentWP = 0;
+	while (true)
+	{
+		const int32 RandNode = FMath::RandRange(0, Graph->Nodes.Num() - 1);
+		if (!Graph->Nodes[RandNode]->OctreeNode->bIsOccupied)
+		{
+			const double Start = FPlatformTime::Seconds();
+			Graph->AStar(Graph->Nodes[CurrentWP]->OctreeNode, Graph->Nodes[RandNode]->OctreeNode, PathList);
+			const double End = FPlatformTime::Seconds();
+
+			UE_LOG(LogTemp, Warning, TEXT("A* Path created in: %f ms"), (End - Start) * 1000.f);
+
+			CurrentWP = 0;
+			// Unoccupied node is found. Break here
+			break; 
+		}
+	}
 	
 }
 
+void ATestFlyingPawn::FindRandomDestinationAndPath()
+{
+	if (Graph == nullptr)
+	{
+		return;
+	}
 
+	// If the node is occupied, the loop continues to find another random node.
+	while (true)
+	{
+		const int32 RandNode = FMath::RandRange(0, Graph->Nodes.Num() - 1);
+		if (!Graph->Nodes[RandNode]->OctreeNode->bIsOccupied)
+		{
+			const double Start = FPlatformTime::Seconds();
+			const int32 StartingId = OctreeActor->AddDestination(GetActorLocation());
+			const FNodeAStar* StartNode = Graph->FindNode(StartingId);
+			if (StartNode && Graph->Nodes[RandNode]->OctreeNode)
+			{
+				Graph->AStar(StartNode->OctreeNode, Graph->Nodes[RandNode]->OctreeNode, PathList);
+				const double End = FPlatformTime::Seconds();
+				DebugPath(5, true);
+				UE_LOG(LogTemp, Warning, TEXT("A* Path created in: %f ms"), (End - Start) * 1000.f);
+				CurrentWP = 0;
+			}
+			// Unoccupied node is found. Break here
+			break; 
+		}
+	}
+}
 
 void ATestFlyingPawn::UpdateMovement(float DeltaTime)
 {

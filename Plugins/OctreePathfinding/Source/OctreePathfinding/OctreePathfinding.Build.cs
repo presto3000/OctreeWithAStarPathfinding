@@ -25,7 +25,9 @@ public class OctreePathfinding : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core",
+				"Core", 
+				"GameplayStateTreeModule", // State Trees
+				"StateTreeModule", // State Trees
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -37,7 +39,9 @@ public class OctreePathfinding : ModuleRules
 				"CoreUObject",
 				"Engine",
 				"Slate",
-				"SlateCore", "AIModule", "Landscape"
+				"SlateCore", 
+				"AIModule", // State Trees
+				"Landscape"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
