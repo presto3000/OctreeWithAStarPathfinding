@@ -709,5 +709,6 @@ void AOctreeActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Threads.Empty();
 	EdgesRunnables.Empty();
 	delete RootNode;
+	delete NavigationGraph;
 }
 

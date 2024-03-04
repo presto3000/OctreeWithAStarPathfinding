@@ -12,6 +12,19 @@ FGraphEntity::FGraphEntity()
 FGraphEntity::~FGraphEntity()
 {
 	PrestoLOG::Log("FGraphEntity Destructor");
+
+	// Free them
+	for (const FEdgeStruct* Edge : Edges)
+	{
+		delete Edge;
+	}
+	Edges.Empty();
+
+	for (const FNodeAStar* Node : Nodes)
+	{
+		delete Node;
+	}
+	Nodes.Empty();
 }
 
 void FGraphEntity::AddNode(FNodeOctree& Otn)
