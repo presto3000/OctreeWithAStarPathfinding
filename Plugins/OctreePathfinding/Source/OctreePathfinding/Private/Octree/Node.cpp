@@ -5,7 +5,7 @@
 
 FEdgeStruct::~FEdgeStruct()
 {
-	PrestoLOG::Log("FEdgeStruct Destructor");
+	//PrestoLOG::Log("FEdgeStruct Destructor");
 }
 
 FNodeAStar::FNodeAStar()
@@ -15,12 +15,6 @@ FNodeAStar::FNodeAStar()
 
 FNodeAStar::~FNodeAStar()
 {
-	PrestoLOG::Log("FNodeAStar Destructor");
-
-	// Free them
-	for (const FEdgeStruct* Edge : EdgeList)
-	{
-		delete Edge;
-	}
-	EdgeList.Empty();
+	//PrestoLOG::Log("FNodeAStar Destructor");
+	
 }

@@ -144,7 +144,7 @@ void ATestFlyingPawn::Update(AGoalActor* InGoalActor)
 		FNodeAStar* FinalGoal = new FNodeAStar{new FNodeOctree{Bounds, 1, nullptr}};
 		
 		NavigateTo(StartingId, DestinationId, FinalGoal);
-		DebugPath(-1, true);
+		//DebugPath(-1, true);
 	}
 }
 
@@ -208,7 +208,7 @@ void ATestFlyingPawn::FindRandomDestinationAndPath()
 			{
 				Graph->AStar(StartNode->OctreeNode, Graph->Nodes[RandNode]->OctreeNode, PathList);
 				const double End = FPlatformTime::Seconds();
-				DebugPath(5, true);
+				//DebugPath(5, true);
 				UE_LOG(LogTemp, Warning, TEXT("A* Path created in: %f ms"), (End - Start) * 1000.f);
 				CurrentWP = 0;
 			}

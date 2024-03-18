@@ -11,17 +11,19 @@ FGraphEntity::FGraphEntity()
 
 FGraphEntity::~FGraphEntity()
 {
-	PrestoLOG::Log("FGraphEntity Destructor");
+	//PrestoLOG::Log("FGraphEntity Destructor");
 
 	// Free them
 	for (const FEdgeStruct* Edge : Edges)
 	{
+		//PrestoLOG::Log("Edge Destructor");
 		delete Edge;
 	}
 	Edges.Empty();
 
 	for (const FNodeAStar* Node : Nodes)
 	{
+		//PrestoLOG::Log("Node Destructor");
 		delete Node;
 	}
 	Nodes.Empty();

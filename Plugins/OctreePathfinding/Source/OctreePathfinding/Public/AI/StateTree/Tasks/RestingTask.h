@@ -23,9 +23,9 @@ struct OCTREEPATHFINDING_API FRestingTaskInstanceData
 	UPROPERTY(EditAnywhere, Category = Parameter)
 	float RotationThreshold = 720.f;
 
-	/** RotationToAddEachTick */
+	/** RotationToAddPerSec */
 	UPROPERTY(EditAnywhere, Category = Parameter)
-	float RotationToAddEachTick = 5.f;
+	float RotationToAddPerSec = 720.f;
 
 	/** RotationAdded Value. */
 	float RotationAdded = 0.f;

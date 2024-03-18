@@ -27,7 +27,7 @@ FNodeOctree::~FNodeOctree()
 	}
 	Children.Empty();
 	
-	PrestoLOG::Log("FNode OctreeDeleted: ", this->Id);
+	//PrestoLOG::Log("FNode OctreeDeleted: ", this->Id);
 }
 
 void FNodeOctree::Draw(UWorld* InWorldContext)

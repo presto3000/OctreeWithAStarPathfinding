@@ -27,8 +27,20 @@ EStateTreeRunStatus FRestingTask::Tick(FStateTreeExecutionContext& Context, cons
 	}
 	else
 	{
-		InstanceData.RotationAdded += InstanceData.RotationToAddEachTick;
-		InstanceData.ReferenceActor->GetMesh()->AddLocalRotation(FRotator{InstanceData.RotationToAddEachTick, 0, 0});
-		return EStateTreeRunStatus::Running;
+		const float RemainingRotation = InstanceData.RotationThreshold - InstanceData.RotationAdded;
+		const float RotationToAddThisFrame = FMath::Min(InstanceData.RotationToAddPerSec * DeltaTime, RemainingRotation);
+		InstanceData.RotationAdded += RotationToAddThisFrame;
+		InstanceData.ReferenceActor->GetMesh()->AddLocalRotation(FRotator{RotationToAddThisFrame, 0, 0});
+
+		if (InstanceData.RotationAdded >= InstanceData.RotationThreshold)
+		{
+			InstanceData.ReferenceActor->SetFlyingPawnState(InstanceData.FlyingPawnStateOnSuccess);
+			InstanceData.RotationAdded = 0;
+			return EStateTreeRunStatus::Succeeded;
+		}
+		else
+		{
+			return EStateTreeRunStatus::Running;
+		}
 	}
 }
