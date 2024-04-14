@@ -61,7 +61,7 @@ void FNodeOctree::Draw(UWorld* InWorldContext)
 	// Draw Occupied
 	if (bIsOccupied)
 	{
-		DrawDebugSphere(InWorldContext, NodeBounds.GetCenter(), NodeBounds.GetExtent().Length()/2.f, 12, FColor::Blue, true, -10, 0);
+		DrawDebugSphere(InWorldContext, NodeBounds.GetCenter(), NodeBounds.GetExtent().Length()/2.f, 30, FColor::Blue, true, -10, 0);
 	}
 }
 
@@ -160,10 +160,12 @@ void AOctreeActor::CreateOctree()
 
 void AOctreeActor::ProcessObjectsAndEdges(const TArray<AActor*>& InWorldActors)
 {
+	EmptyLeaves.Empty();
 	GetEmptyLeaves(RootNode);
 	//DrawEmptyLeaves();
 	ConnectLeafNodeNeighboursMultithreaded();
-
+	NavigationGraph->RemoveInvalidEdges();
+	NavigationGraph->RemoveInvalidNodes();
 	
 	PrestoLOG::Log("RootNodeId:", RootNode->Id);
 	PrestoLOG::Log("Nodes Number: ", NavigationGraph->Nodes.Num());
@@ -214,7 +216,7 @@ void FNodeOctree::DivideAndAdd(UWorld* InWorldContext, AActor* InActor)
 	{
 		ContainedActors.Add(InActor);
 		bIsOccupied = true;
-		//DrawDebugBox(InWorldContext, NodeBounds.GetCenter(), NodeBounds.GetExtent(), FColor::Cyan, true, -1, 0, 7);
+		//DrawDebugBox(InWorldContext, NodeBounds.GetCenter(), NodeBounds.GetExtent(), FColor::Cyan, false, 2, 0, 7);
 		return;
 	}
 
@@ -372,6 +374,7 @@ void AOctreeActor::GetEmptyLeaves(FNodeOctree* InNode)
 	{
 		return;
 	}
+	
 	// Must be a leaf node
 	if (InNode->Children.IsEmpty())
 	{
@@ -565,6 +568,7 @@ void AOctreeActor::ConnectLeafNodeNeighboursMultithreaded()
 			delete Thread;
 		}
 	}
+	Threads.Empty();
 }
 
 void AOctreeActor::ProcessLeafNodes(int startIndex, int endIndex)

@@ -21,6 +21,8 @@ public:
 	
 	FNodeAStar* FindNode(const int32 OctreeNodeId);
 	void AddEdge(const FNodeOctree* FromNode, const FNodeOctree* ToNode);
+	void RemoveInvalidEdges();
+	void RemoveInvalidNodes();
 	bool AStar(const FNodeOctree* StartNode, const FNodeOctree* EndNode, TArray<FNodeAStar*>& PathList);
 	int32 LowestF(TArray<FNodeAStar*> InNodes);
 	void ReconstructPath(FNodeAStar* StartNode, FNodeAStar* EndNode, TArray<FNodeAStar*>& PathList);

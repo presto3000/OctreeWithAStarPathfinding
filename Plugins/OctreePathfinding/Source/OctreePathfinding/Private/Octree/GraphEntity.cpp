@@ -58,19 +58,81 @@ void FGraphEntity::AddEdge(const FNodeOctree* FromNode, const FNodeOctree* ToNod
 	{
 		return;
 	}
+
 	FNodeAStar* From = FindNode(FromNode->Id);
 	FNodeAStar* To = FindNode(ToNode->Id);
 
 	if (From && To)
 	{
-		// One Direction
-		FEdgeStruct* E = new FEdgeStruct(From, To);
-		Edges.Add(E);
-		From->EdgeList.Add(E);
-		// 2nd Direction
-		FEdgeStruct* F = new FEdgeStruct(To, From);
-		Edges.Add(F);
-		To->EdgeList.Add(F);
+		// Check if the edge already exists
+		bool EdgeExists = false;
+		for (FEdgeStruct* ExistingEdge : From->EdgeList)
+		{
+			if (ExistingEdge->EndNode == To)
+			{
+				EdgeExists = true;
+				break;
+			}
+		}
+
+		if (!EdgeExists)
+		{
+			// One Direction
+			FEdgeStruct* E = new FEdgeStruct(From, To);
+			Edges.Add(E);
+			From->EdgeList.Add(E);
+			// 2nd Direction
+			FEdgeStruct* F = new FEdgeStruct(To, From);
+			Edges.Add(F);
+			To->EdgeList.Add(F);
+		}
+	}
+}
+
+void FGraphEntity::RemoveInvalidEdges()
+{
+	TArray<FEdgeStruct*> InvalidEdges;
+	
+	for (FEdgeStruct* Edge : Edges)
+	{
+		if (!Edge->StartNode->OctreeNode->IsLeafNode() || !Edge->EndNode->OctreeNode->IsLeafNode() || Edge->StartNode->OctreeNode->bIsOccupied || Edge->EndNode->OctreeNode->bIsOccupied)
+		{
+			InvalidEdges.Add(Edge);
+		}
+	}
+	
+	for (FEdgeStruct* InvalidEdge : InvalidEdges)
+	{
+		InvalidEdge->StartNode->EdgeList.Remove(InvalidEdge);
+		InvalidEdge->EndNode->EdgeList.Remove(InvalidEdge);
+		Edges.Remove(InvalidEdge);
+		delete InvalidEdge;
+	}
+}
+
+void FGraphEntity::RemoveInvalidNodes()
+{
+	TArray<FNodeAStar*> InvalidNodes;
+	
+	for (FNodeAStar* Node : Nodes)
+	{
+		if (!Node->OctreeNode->IsLeafNode() || Node->OctreeNode->bIsOccupied)
+		{
+			InvalidNodes.Add(Node);
+		}
+	}
+	
+	for (FNodeAStar* InvalidNode : InvalidNodes)
+	{
+		for (FEdgeStruct* Edge : InvalidNode->EdgeList)
+		{
+			Edges.Remove(Edge);
+			delete Edge;
+		}
+		InvalidNode->EdgeList.Empty();
+		
+		Nodes.Remove(InvalidNode);
+		delete InvalidNode;
 	}
 }
 

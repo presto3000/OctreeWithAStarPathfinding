@@ -149,6 +149,7 @@ protected:
 	void CreateOctree();
 	UFUNCTION(CallInEditor)
 	void GetActorsInsideBoxComponent();
+	UFUNCTION(BlueprintCallable)
 	void AddObjects(TArray<AActor*> InWorldActors);
 
 	int32 FindBindingNode(FNodeOctree* Node, const FVector& Position);
